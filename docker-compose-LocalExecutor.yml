@@ -1,0 +1,88 @@
+version: '3.7'
+
+services:
+  postgres:
+    image: postgres:9.6
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    networks:
+      - airflow-net
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  data-postgres:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+      - POSTGRES_DB=dataDB
+    ports:
+      - "5423:5432"
+    volumes:
+      - main_data:/var/lib/postgresql/data
+    networks:
+      - airflow-net
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  webserver:
+    build: .
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=Local
+      - PYTHONPATH=/usr/local/airflow
+      - AIRFLOW_CONN_DATA_POSTGRES=postgresql://user:pass@data-postgres:5432/dataDB
+    volumes:
+      - ./dags:/usr/local/airflow/dags
+      - ./script:/usr/local/airflow/script
+    ports:
+      - "8080:8080"
+    networks:
+      - airflow-net
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+  superset:
+    build:
+      context: .
+      dockerfile: Dockerfile.superset
+    container_name: superset
+    ports:
+      - "8088:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=supersecretkey
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin
+      - ADMIN_FIRST_NAME=Superset
+      - ADMIN_LAST_NAME=Admin
+      - ADMIN_EMAIL=admin@superset.com
+    depends_on:
+      - data-postgres
+    networks:
+      - airflow-net
+    volumes:
+      - ./superset:/app/superset_home
+    command: >
+      /bin/sh -c "superset db upgrade &&
+                  superset fab create-admin --username admin --firstname Superset --lastname Admin --email admin@superset.com --password admin &&
+                  superset init &&
+                  superset run -h 0.0.0.0 -p 8088"
+
+
+volumes:
+  main_data:
+
+networks:
+  airflow-net:
