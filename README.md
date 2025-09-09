@@ -100,7 +100,7 @@ The pipeline performs the following steps:
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/<your-repo>/crypto-etl.git
+git clone https://github.com/delliriumL/Crypto-ETL-Pipeline
 cd crypto-etl
 ```
 
